@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block title %}Avaliação Contínua: Aula 10{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+  <h1>Olá, {% if name %}{{ name }}{% else %}estranho{% endif %}!</h1>
+  {% if not known %}
+  <p>Prazer em conhecê-lo!</p>
+  {% else %}
+  <p>Feliz em vê-lo novamente!</p>
+  {% endif %}
+</div>
+
+<form method="POST" action="/">
+  {{ form.hidden_tag() }}
+
+  <div class="form-group">
+    {{ form.name.label }}
+    {{ form.name(class="form-control") }}
+  </div>
+
+  <div class="form-group">
+    {{ form.submit(class="btn btn-primary") }}
+  </div>
+</form>
+
+<p>The local date and time is {{ current_time.strftime('%Y-%m-%d %H:%M:%S') }}.</p>
+{% endblock %}
