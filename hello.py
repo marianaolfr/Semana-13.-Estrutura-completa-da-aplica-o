@@ -4,11 +4,12 @@ from flask_bootstrap import Bootstrap
 from flask_moment import Moment
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, SelectField
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, Email
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import requests
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ MAILGUN_RECIPIENTS = os.getenv('MAILGUN_RECIPIENTS')
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'hard to guess string'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'hard to guess string')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -41,6 +42,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, index=True)
+    email = db.Column(db.String(120), unique=True, index=True)  # Campo de e-mail
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
     def __repr__(self):
@@ -48,31 +50,30 @@ class User(db.Model):
 
 class NameForm(FlaskForm):
     name = StringField('What is your name?', validators=[DataRequired()])
+    email = StringField('What is your email?', validators=[DataRequired(), Email()])
     role = SelectField('Role?', choices=[('Administrator', 'Administrator'), ('Moderator', 'Moderator'), ('User', 'User')])
     submit = SubmitField('Submit')
 
-
-def send_email(name, prontuario):
+def send_email(name, email):
+    recipients = MAILGUN_RECIPIENTS.split(',') + [email]
     response = requests.post(
         f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
         auth=("api", MAILGUN_API_KEY),
         data={
             "from": f"Sua Aplicação <mailgun@{MAILGUN_DOMAIN}>",
-            "to": MAILGUN_RECIPIENTS.split(','),
+            "to": recipients,
             "subject": "Novo Usuário Cadastrado",
             "text": f"""
             Um novo usuário foi cadastrado!
 
             Nome: {name}
-            Prontuário: {prontuario}
+            E-mail: {email}
             """
         }
     )
-
     if response.status_code != 200:
         error_message = f"Status code: {response.status_code}, Resposta: {response.text}"
         raise Exception(error_message)
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -89,12 +90,27 @@ def index():
         user_by_role.append(obj_rel)
 
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.name.data).first()
+        user = User.query.filter_by(email=form.email.data).first()  # Verificação pelo email
         if user is None:
             role = Role.query.filter_by(name=form.role.data).first()
-            user = User(username=form.name.data, role=role)
+            user = User(username=form.name.data, email=form.email.data, role=role)
             db.session.add(user)
             db.session.commit()
             session['known'] = False
             flash('You were successfully registered.')
-            send_email(form.name.data, "PT123456")
+            try:
+                send_email(form.name.data, form.email.data)  # Envio de e-mail
+            except Exception as e:
+                flash(f'Error while sending email: {e}', 'danger')
+        else:
+            flash('Email already registered.', 'info')
+
+    return render_template(
+        'index.html',
+        form=form,
+        users=users,
+        current_time=datetime.utcnow()
+    )
+
+if __name__ == "__main__":
+    app.run(debug=True)
