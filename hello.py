@@ -20,7 +20,7 @@ MAILGUN_RECIPIENTS = os.getenv('MAILGUN_RECIPIENTS')
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'hard to guess string')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or 'a_difficult_and_secure_key_2025'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
